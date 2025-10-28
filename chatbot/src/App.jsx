@@ -1,59 +1,43 @@
 import "./App.css";
 import { useRef, useState } from "react";
 import { useAskQuestion } from "./hooks/useAskQuestion";
-import Message from "./components/Message";
+import Message from "./Components/Message";
 import Loading from "./components/Loading";
 
-/**
- * Componente principal del chatbot de TechNova AB.
- * - Usa LangChain (vía useAskQuestion) para consultar respuestas.
- * - Muestra mensajes del usuario y del bot.
- * - Implementa scroll automático hacia el último mensaje.
- */
-
 function App() {
-  const [messages, setMessages] = useState([
-    {
-      sender: "bot",
-      text: "Hej! Jag är TechNova kundtjänstbot. Vad vill du veta om våra produkter, leveranser eller garantier?",
-    },
-  ]);
+  const [messages, setMessages] = useState([]); // historial del chat
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef();
 
-  const [input, setInput] = useState("");
-  const { askQuestion, loading } = useAskQuestion();
-  const messagesEndRef = useRef(null);
+  const { askQuestion } = useAskQuestion();
 
-  // Desplaza el scroll al último mensaje automáticamente
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const handleSend = async () => {
+    const question = inputRef.current.value.trim();
+    if (!question) return;
 
-  // Se ejecuta cuando el usuario envía una pregunta
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    const userMessage = { sender: "user", text: input };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+    setMessages((prev) => [...prev, { sender: "user", text: question }]);
+    setLoading(true);
 
     try {
-      const response = await askQuestion(input);
-      const botMessage = { sender: "bot", text: response };
-      setMessages((prev) => [...prev, botMessage]);
+      // Llamada al backend /api/chat
+      const answer = await askQuestion(question);
+      setMessages((prev) => [...prev, { sender: "bot", text: answer }]);
     } catch (error) {
-      const errorMessage = {
-        sender: "bot",
-        text: "Tyvärr uppstod ett fel när jag försökte hämta svaret.",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "bot",
+          text: "Tyvärr, jag kunde inte hämta något svar just nu.",
+        },
+      ]);
     } finally {
-      scrollToBottom();
+      setLoading(false);
+      inputRef.current.value = "";
     }
   };
 
   return (
-    <div className="app-container">
+    <div className="chat-container">
       <h1 className="title">TechNova AB Kundtjänstbot</h1>
 
       <div className="chat-box">
@@ -61,20 +45,17 @@ function App() {
           <Message key={index} sender={msg.sender} text={msg.text} />
         ))}
         {loading && <Loading />}
-        <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSend} className="input-area">
+      <div className="input-container">
         <input
           type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          ref={inputRef}
           placeholder="Skriv din fråga här..."
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
         />
-        <button type="submit" disabled={loading}>
-          Skicka
-        </button>
-      </form>
+        <button onClick={handleSend}>Skicka</button>
+      </div>
     </div>
   );
 }

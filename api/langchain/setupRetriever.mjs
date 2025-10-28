@@ -1,20 +1,22 @@
-import { OllamaEmbeddings } from "@langchain/community/embeddings/ollama";
-import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
 import { createClient } from "@supabase/supabase-js";
+import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
+import { OpenAIEmbeddings } from "@langchain/openai";
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_API_KEY = process.env.SUPABASE_API_KEY;
+export const createRetriever = async () => {
+  const client = createClient(
+    process.env.VITE_SUPABASE_URL,
+    process.env.VITE_SUPABASE_ANON_KEY
+  );
 
-const embeddings = new OllamaEmbeddings({ model: "llama3.1:8b" });
+  const embeddings = new OpenAIEmbeddings({
+    apiKey: process.env.VITE_OPENAI_API_KEY,
+  });
 
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_API_KEY);
+  const vectorStore = new SupabaseVectorStore(embeddings, {
+    client,
+    tableName: "documents",
+    queryName: "match_documents",
+  });
 
-const vectorStore = new SupabaseVectorStore(embeddings, {
-  client: supabaseClient,
-  tableName: "documents",
-  queryName: "match_documents",
-});
-
-const retriever = vectorStore.asRetriever();
-
-export { retriever };
+  return vectorStore;
+};

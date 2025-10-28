@@ -4,11 +4,16 @@ import chatRoutes from "./routes/chatRoutes.mjs";
 import "dotenv/config";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
+// Middlewares
 app.use(cors());
 app.use(express.json());
+
+// Routes
 app.use("/api/chat", chatRoutes);
+
+// Puerto
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
