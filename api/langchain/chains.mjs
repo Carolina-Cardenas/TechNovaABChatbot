@@ -1,28 +1,86 @@
-// api/langchain/chainFactory.mjs
-import { RunnableSequence, RunnableMap } from "@langchain/core/runnables";
-import { customerServicePrompt } from "./promptTemplate.mjs";
-import { createChatModel } from "./model.mjs";
+/**
+ * Construye la cadena de razonamiento del chatbot:
+ * 1. Reformula la pregunta del usuario (standalone question)
+ * 2. Recupera documentos relevantes del vector store
+ * 3. Genera una respuesta final contextual
+ */
+
+import {
+  RunnableSequence,
+  RunnablePassthrough,
+} from "@langchain/core/runnables";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+import { ChatOllama } from "@langchain/community/chat_models/ollama";
+
+import { createRetriever } from "../service/setupRetriever.mjs";
+import {
+  standaloneQuestionTemplate,
+  answerTemplate,
+} from "./promptTemplates.mjs";
 
 /**
- * Construye la cadena principal de LangChain para TechNova AB.
- * Incluye control de flujo y persistencia temporal del contexto.
+ * Instancia del modelo Llama3 vía Ollama
+ * Se recomienda mantener el modelo aquí directamente
+ * para simplicidad en entornos educativos.
  */
-export const createQAChain = (contextHistory = []) => {
-  const model = createChatModel();
+const llm = new ChatOllama({
+  model: "llama3.1:8b",
+  temperature: 0.3,
+});
 
-  // Subflujo: mezcla contexto previo y nuevo contexto de documentos
-  const contextualizer = RunnableMap.fromRecord({
-    fullContext: async (input) =>
-      [...contextHistory, input.context].join("\n---\n"),
-    question: (input) => input.question,
-  });
+/**
+ * Combina múltiples documentos en un solo string
+ * @param {Array} docs - Lista de documentos del retriever
+ * @returns {string} texto combinado
+ */
+function combineDocuments(docs) {
+  return docs.map((doc) => doc.pageContent).join("\n\n");
+}
 
-  // Secuencia completa
-  const chain = RunnableSequence.from([
-    contextualizer,
-    customerServicePrompt,
-    model,
-  ]);
+/**
+ * Cadena 1: Reformulación de la pregunta
+ */
+const standaloneQuestionChain = RunnableSequence.from([
+  standaloneQuestionTemplate,
+  llm,
+  new StringOutputParser(),
+]);
 
-  return chain;
-};
+/**
+ * Cadena 2: Recuperación de documentos relevantes
+ */
+const retrieveDocumentsChain = RunnableSequence.from([
+  async (data) => {
+    const retriever = await createRetriever();
+    const docs = await retriever.similaritySearch(data.standaloneQuestion, 3);
+    return combineDocuments(docs);
+  },
+]);
+
+/**
+ * Cadena 3: Generación de la respuesta final
+ */
+const answerChain = RunnableSequence.from([
+  answerTemplate,
+  llm,
+  new StringOutputParser(),
+]);
+
+/**
+ * Cadena principal (QA Chain)
+ * Estructura:
+ * Paso 1: Reformula pregunta
+ * Paso 2: Recupera contexto
+ * Paso 3: Genera respuesta final
+ */
+export const qaChain = RunnableSequence.from([
+  {
+    standaloneQuestion: standaloneQuestionChain,
+    originalQuestion: new RunnablePassthrough(),
+  },
+  {
+    context: retrieveDocumentsChain,
+    question: ({ originalQuestion }) => originalQuestion.question,
+  },
+  answerChain,
+]);

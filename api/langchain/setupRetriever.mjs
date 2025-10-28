@@ -4,12 +4,12 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 
 export const createRetriever = async () => {
   const client = createClient(
-    process.env.VITE_SUPABASE_URL,
-    process.env.VITE_SUPABASE_ANON_KEY
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY
   );
 
   const embeddings = new OpenAIEmbeddings({
-    apiKey: process.env.VITE_OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
   });
 
   const vectorStore = new SupabaseVectorStore(embeddings, {
