@@ -1,25 +1,28 @@
-import { faqPrompt } from "./promptTemplates.mjs";
-import { retriever } from "../service/setupRetriever.mjs";
-import { Ollama } from "@langchain/community/llms/ollama";
-import { RunnableSequence } from "@langchain/core/runnables";
-
-const model = new Ollama({ model: "llama3.1:8b" });
+// api/langchain/chainFactory.mjs
+import { RunnableSequence, RunnableMap } from "@langchain/core/runnables";
+import { customerServicePrompt } from "./promptTemplate.mjs";
+import { createChatModel } from "./model.mjs";
 
 /**
- * Cadena QA: busca contexto y genera respuesta contextualizada.
+ * Construye la cadena principal de LangChain para TechNova AB.
+ * Incluye control de flujo y persistencia temporal del contexto.
  */
-const chain = RunnableSequence.from([
-  {
-    input: (input) => retriever.getRelevantDocuments(input),
-    transform: (docs) => ({
-      context: docs.map((d) => d.pageContent).join("\n\n"),
-    }),
-  },
-  faqPrompt,
-  model,
-]);
+export const createQAChain = (contextHistory = []) => {
+  const model = createChatModel();
 
-export async function qaChain(question) {
-  const result = await chain.invoke({ question });
-  return { answer: result };
-}
+  // Subflujo: mezcla contexto previo y nuevo contexto de documentos
+  const contextualizer = RunnableMap.fromRecord({
+    fullContext: async (input) =>
+      [...contextHistory, input.context].join("\n---\n"),
+    question: (input) => input.question,
+  });
+
+  // Secuencia completa
+  const chain = RunnableSequence.from([
+    contextualizer,
+    customerServicePrompt,
+    model,
+  ]);
+
+  return chain;
+};
