@@ -2,7 +2,7 @@ import "./App.css";
 import { useRef, useState } from "react";
 import { useAskQuestion } from "./hooks/useAskQuestion";
 import Message from "./Components/Message";
-import Loading from "./components/Loading";
+import Loading from "./Components/Loading";
 
 function App() {
   const [messages, setMessages] = useState([]); // historial del chat
