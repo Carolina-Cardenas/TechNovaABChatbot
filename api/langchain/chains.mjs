@@ -1,22 +1,22 @@
+import {
+  RunnableSequence,
+  RunnablePassthrough,
+  RunnableLambda,
+} from "@langchain/core/runnables";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+import { ChatOllama } from "@langchain/ollama";
+import { createRetriever } from "../langchain/setupRetriever.mjs";
+import {
+  standaloneQuestionTemplate,
+  customerServicePrompt,
+} from "./promptTemplates.mjs";
+
 /**
  * Construye la cadena de razonamiento del chatbot:
  * 1. Reformula la pregunta del usuario (standalone question)
  * 2. Recupera documentos relevantes del vector store
  * 3. Genera una respuesta final contextual
  */
-
-import {
-  RunnableSequence,
-  RunnablePassthrough,
-} from "@langchain/core/runnables";
-import { StringOutputParser } from "@langchain/core/output_parsers";
-import { ChatOllama } from "@langchain/community/chat_models/ollama";
-
-import { createRetriever } from "../service/setupRetriever.mjs";
-import {
-  standaloneQuestionTemplate,
-  answerTemplate,
-} from "./promptTemplates.mjs";
 
 /**
  * Instancia del modelo Llama3 vía Ollama
@@ -25,7 +25,7 @@ import {
  */
 const llm = new ChatOllama({
   model: "llama3.1:8b",
-  temperature: 0.3,
+  temperature: 0.4,
 });
 
 /**
@@ -34,9 +34,9 @@ const llm = new ChatOllama({
  * @returns {string} texto combinado
  */
 function combineDocuments(docs) {
-  return docs.map((doc) => doc.pageContent).join("\n\n");
+  if (!Array.isArray(docs)) return "";
+  return docs.map((d) => d.pageContent || d.content || "").join("\n\n");
 }
-
 /**
  * Cadena 1: Reformulación de la pregunta
  */
@@ -49,10 +49,18 @@ const standaloneQuestionChain = RunnableSequence.from([
 /**
  * Cadena 2: Recuperación de documentos relevantes
  */
-const retrieveDocumentsChain = RunnableSequence.from([
+const retrieveDocumentsChain = RunnableLambda.from([
   async (data) => {
+    console.log("[chains] retrieveDocumentsChain input:", data);
     const retriever = await createRetriever();
-    const docs = await retriever.similaritySearch(data.standaloneQuestion, 3);
+    const docs = await retriever.similaritySearch(
+      (data && data.standaloneQuestion) || data,
+      3
+    );
+    console.log(
+      "[chains] retrieved docs count:",
+      Array.isArray(docs) ? docs.length : 0
+    );
     return combineDocuments(docs);
   },
 ]);
@@ -61,10 +69,28 @@ const retrieveDocumentsChain = RunnableSequence.from([
  * Cadena 3: Generación de la respuesta final
  */
 const answerChain = RunnableSequence.from([
-  answerTemplate,
+  customerServicePrompt,
   llm,
   new StringOutputParser(),
 ]);
+
+export function createQAChain(contextHistory = []) {
+  const historyContext =
+    contextHistory.length > 0
+      ? `${contextHistory.slice(-3).join("\n---\n")}\n`
+      : "";
+
+  return RunnableLambda.from([
+    async ({ context, question }) => {
+      const fullContext = historyContext + context;
+      const response = await answerChain.invoke({
+        context: fullContext,
+        question,
+      });
+      return response;
+    },
+  ]);
+}
 
 /**
  * Cadena principal (QA Chain)
@@ -80,7 +106,11 @@ export const qaChain = RunnableSequence.from([
   },
   {
     context: retrieveDocumentsChain,
-    question: ({ originalQuestion }) => originalQuestion.question,
+    question: ({ originalQuestion }) => {
+      if (!originalQuestion) return "";
+      if (typeof originalQuestion === "string") return originalQuestion;
+      return originalQuestion.question ?? "";
+    },
   },
   answerChain,
 ]);

@@ -1,6 +1,6 @@
 import express from "express";
-import { createRetriever } from "../langchain/retriever.mjs";
-import { createQAChain } from "../langchain/chainFactory.mjs";
+import { createRetriever } from "../langchain/setupRetriever.mjs";
+import { createQAChain } from "../langchain/chains.mjs";
 import { logInteraction } from "../utils/logger.mjs";
 import { handleError } from "../utils/errorHandler.mjs";
 

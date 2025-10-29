@@ -1,8 +1,14 @@
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 
-/**
- * Prompt base: instruye al modelo sobre el tono y limitaciones.
- */
+export const standaloneQuestionTemplate = ChatPromptTemplate.fromTemplate(`
+Givet en konversationshistorik och en uppföljningsfråga, 
+omformulera uppföljningsfrågan till en fristående fråga på svenska.
+
+Konversationshistorik: {conv_history}
+Uppföljningsfråga: {question}
+Fristående fråga:
+`);
+
 export const customerServicePrompt = ChatPromptTemplate.fromTemplate(`
 Du är en vänlig och hjälpsam kundtjänstrepresentant för TechNova AB.
 
