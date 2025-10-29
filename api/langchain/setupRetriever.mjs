@@ -18,5 +18,5 @@ export const createRetriever = async () => {
     queryName: "match_documents",
   });
 
-  return vectorStore;
+  return vectorStore.asRetriever();
 };

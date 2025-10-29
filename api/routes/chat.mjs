@@ -5,9 +5,7 @@ import { logInteraction } from "../utils/logger.mjs";
 import { handleError } from "../utils/errorHandler.mjs";
 
 const router = express.Router();
-
-// Historial temporal en memoria
-let contextHistory = [];
+var contextHistory = [];
 
 /**
  * POST /api/chat
