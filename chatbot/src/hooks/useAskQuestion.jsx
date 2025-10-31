@@ -27,7 +27,7 @@ export const useAskQuestion = () => {
       }
 
       const data = await response.json();
-      return data.answer || "Jag kunde tyvärr inte hitta något svar.";
+      return data?.answer ?? "Jag kunde tyvärr inte hitta något svar.";
     } catch (error) {
       console.error("Error i useAskQuestion:", error);
       return "Ett fel uppstod när jag försökte hämta svaret.";
