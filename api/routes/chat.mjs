@@ -7,27 +7,39 @@ import { handleError } from "../utils/errorHandler.mjs";
 const router = express.Router();
 var contextHistory = [];
 
-/**
- * POST /api/chat
- * Cuerpo esperado: { question: string }
- */
 router.post("/", async (req, res) => {
   try {
     const { question } = req.body;
     if (!question) return res.status(400).json({ error: "Fråga saknas." });
 
     const retriever = await createRetriever();
-    const relevantDocs = await retriever.similaritySearch(question, 3);
+    console.log("Retriever type:", retriever.constructor.name);
+    console.log(
+     "Retriever methods:"
+      Object.getOwnPropertyNames(Object.getPrototypeOf(retriever))
+    );
 
-    console.log("Documentos recuperados:", relevantDocs.length);
+    const relevantDocs = await retriever._getRelevantDocuments(question);
+
     if (relevantDocs.length === 0) {
-      console.warn(" No se encontraron documentos en Supabase.");
     }
 
-    const context = relevantDocs.map((d) => d.pageContent).join("\n---\n");
+    let context = relevantDocs.map((d) => d.pageContent).join("\n---\n");
+    const MAX_CONTEXT_LENGTH = 2000;
+    if (context.length > MAX_CONTEXT_LENGTH) {
+      context =
+        context.slice(0, MAX_CONTEXT_LENGTH) + "\n...(context truncated)...";
+    }
 
     const qaChain = createQAChain(contextHistory);
-    const response = await qaChain.invoke({ context, question });
+    console.log(qaChain);
+    let response;
+    try {
+      response = await qaChain.invoke({ context, question });
+    } catch (error) {
+      response = "Modellen svarade inte. Försök igen senare.";
+    }
+
     const answer =
       typeof response === "string"
         ? response
@@ -38,8 +50,6 @@ router.post("/", async (req, res) => {
 
     res.json({ answer });
   } catch (error) {
-    console.error(" Error completo en /api/chat:");
-    console.error(error);
     res.status(500).json({
       error: error.message,
       stack: error.stack,

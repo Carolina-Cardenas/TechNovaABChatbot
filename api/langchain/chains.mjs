@@ -13,50 +13,31 @@ import {
 
 const llm = new ChatOllama({
   baseUrl: "http://localhost:11434",
-  model: "llama3.1:8b",
+  model: "llama2:7b",
   temperature: 0.4,
 });
 
-/**
- * Combina múltiples documentos en un solo string
- * @param {Array} docs - Lista de documentos del retriever
- * @returns {string} texto combinado
- */
 function combineDocuments(docs) {
   if (!Array.isArray(docs)) return "";
   return docs.map((d) => d.pageContent || d.content || "").join("\n\n");
 }
-/**
- * Cadena 1: Reformulación de la pregunta
- */
+
 const standaloneQuestionChain = RunnableSequence.from([
   standaloneQuestionTemplate,
   llm,
   new StringOutputParser(),
 ]);
 
-/**
- * Cadena 2: Recuperación de documentos relevantes
- */
-const retrieveDocumentsChain = RunnableLambda.from([
-  async (data) => {
-    console.log("[chains] retrieveDocumentsChain input:", data);
+const retrieveDocumentsChain = new RunnableLambda({
+  func: async (data) => {
     const retriever = await createRetriever();
-    const docs = await retriever.similaritySearch(
-      (data && data.standaloneQuestion) || data,
-      3
-    );
-    console.log(
-      "[chains] retrieved docs count:",
-      Array.isArray(docs) ? docs.length : 0
-    );
-    return combineDocuments(docs);
+    const question = data?.standaloneQuestion || data;
+    const docs = await retriever._getRelevantDocuments(question);
+    const combinedContext = combineDocuments(docs);
+    return combinedContext;
   },
-]);
+});
 
-/**
- * Cadena 3: Generación de la respuesta final
- */
 const answerChain = RunnableSequence.from([
   customerServicePrompt,
   llm,
@@ -69,8 +50,8 @@ export function createQAChain(contextHistory = []) {
       ? `${contextHistory.slice(-3).join("\n---\n")}\n`
       : "";
 
-  return RunnableLambda.from([
-    async ({ context, question }) => {
+  return new RunnableLambda({
+    func: async ({ context, question }) => {
       const fullContext = historyContext + context;
       const response = await answerChain.invoke({
         context: fullContext,
@@ -78,16 +59,9 @@ export function createQAChain(contextHistory = []) {
       });
       return response;
     },
-  ]);
+  });
 }
 
-/**
- * Cadena principal (QA Chain)
- * Estructura:
- * Paso 1: Reformula pregunta
- * Paso 2: Recupera contexto
- * Paso 3: Genera respuesta final
- */
 export const qaChain = RunnableSequence.from([
   {
     standaloneQuestion: standaloneQuestionChain,
@@ -95,11 +69,10 @@ export const qaChain = RunnableSequence.from([
   },
   {
     context: retrieveDocumentsChain,
-    question: ({ originalQuestion }) => {
-      if (!originalQuestion) return "";
-      if (typeof originalQuestion === "string") return originalQuestion;
-      return originalQuestion.question ?? "";
-    },
+    question: ({ originalQuestion }) =>
+      typeof originalQuestion === "string"
+        ? originalQuestion
+        : originalQuestion?.question ?? "",
   },
   answerChain,
 ]);

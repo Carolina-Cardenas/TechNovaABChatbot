@@ -23,7 +23,7 @@ async function run() {
     chunkOverlap: 120,
   });
   const docs = await splitter.createDocuments([text]);
-
+  console.log(process.env.SUPABASE_URL);
   // 3. Conectar con Supabase
   const client = createClient(
     process.env.SUPABASE_URL,
