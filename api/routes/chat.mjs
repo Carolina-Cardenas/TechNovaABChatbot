@@ -18,20 +18,32 @@ router.post("/", async (req, res) => {
 
     const retriever = await createRetriever();
     const relevantDocs = await retriever.similaritySearch(question, 3);
+
+    console.log("Documentos recuperados:", relevantDocs.length);
+    if (relevantDocs.length === 0) {
+      console.warn(" No se encontraron documentos en Supabase.");
+    }
+
     const context = relevantDocs.map((d) => d.pageContent).join("\n---\n");
 
     const qaChain = createQAChain(contextHistory);
     const response = await qaChain.invoke({ context, question });
+    const answer =
+      typeof response === "string"
+        ? response
+        : response?.content || "Jag kunde inte hitta ett svar.";
 
-    const answer = response?.content || "Jag kunde inte hitta ett svar.";
     contextHistory.push(`Fråga: ${question}\nSvar: ${answer}`);
-
     logInteraction(question, answer);
 
     res.json({ answer });
   } catch (error) {
-    handleError(res, error, "Ett fel uppstod vid bearbetning av frågan.");
+    console.error(" Error completo en /api/chat:");
+    console.error(error);
+    res.status(500).json({
+      error: error.message,
+      stack: error.stack,
+    });
   }
 });
-
 export default router;

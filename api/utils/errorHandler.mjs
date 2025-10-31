@@ -1,4 +1,9 @@
+import { de } from "zod/v4/locales";
+
 export const handleError = (res, error, message = "Server error") => {
-  console.error(error);
-  return res.status(500).json({ error: message });
+  console.error("Error :", error);
+  res.status(500).json({
+    error: message,
+    details: error.message,
+  });
 };

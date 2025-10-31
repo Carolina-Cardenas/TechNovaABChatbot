@@ -11,19 +11,8 @@ import {
   customerServicePrompt,
 } from "./promptTemplates.mjs";
 
-/**
- * Construye la cadena de razonamiento del chatbot:
- * 1. Reformula la pregunta del usuario (standalone question)
- * 2. Recupera documentos relevantes del vector store
- * 3. Genera una respuesta final contextual
- */
-
-/**
- * Instancia del modelo Llama3 vía Ollama
- * Se recomienda mantener el modelo aquí directamente
- * para simplicidad en entornos educativos.
- */
 const llm = new ChatOllama({
+  baseUrl: "http://localhost:11434",
   model: "llama3.1:8b",
   temperature: 0.4,
 });
